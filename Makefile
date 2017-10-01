@@ -115,5 +115,5 @@ format:
 size:
 	$(AVRSIZE) $(AVRSIZEARGS) $(ELF)
 
-.PHONY: clean dist-clean install format size
+.PHONY: all clean dist-clean install format size
 
