@@ -23,6 +23,11 @@ BINDIR = bin
 TARGET = $(BINDIR)/$(MCU)-user-code.ihx
 ELF = $(BINDIR)/$(MCU)-user-code.elf
 
+# Arduino device file defaults to /dev/ttyACM0
+# Use shell command export to define alternative device file
+# Example: export ARDUINO=/dev/ttyACM0
+ARDUINO ?= /dev/ttyACM0
+
 # Source files. wildcard "uses" all .c files in src and lib directory
 SRCDIR = src
 BUILD_LIBS_DIR = lib
