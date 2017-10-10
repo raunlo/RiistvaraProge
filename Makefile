@@ -37,7 +37,7 @@ BUILD_LIBS_DIR = lib
 SRC = $(wildcard $(SRCDIR)/*.c $(BUILD_LIBS_DIR)/*/*.c)
 
 # Define object files from .c files defined above
-OBJ=$(SRC:.c=.o)
+OBJ = $(SRC:.c=.o)
 
 # Compiler flags
 # Note that those beginning with -D are actually pre-processor definitions.
@@ -94,7 +94,7 @@ all: $(ELF) $(TARGET)
 
 # Link object files to elf file
 $(ELF): $(OBJ)
-	$(CC) $(LDFLAGS) $^ -o $@
+	$(CC) $(LDFLAGS) -o $@ $^
 
 # Copy elf to ihx format
 $(TARGET):
