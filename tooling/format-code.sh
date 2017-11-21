@@ -30,7 +30,7 @@ do
                         --mode=c \
                         --suffix=.$ORIG_SUFFIX \
                         --lineend=linux \
-                        $FILE)"
+                         $FILE)"
 
     # If file unchanged print unchanged result message.
     if [[ "$RESULT" = Unchanged* ]]
