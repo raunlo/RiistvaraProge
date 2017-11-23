@@ -65,13 +65,13 @@ void main(void)
     /* init uart0 */
     simple_uart0_init();
     stdin = stdout = &simple_uart0_io; /* stdin=stdout stream */
-    fprintf(stdout, "%s\n", STUDENT_NAME_CONSOLE); /* print student name */
+    fprintf_P(stdout,  PSTR(STUDENT_NAME_CONSOLE)); /* print student name */
     /* ascii table */
     print_ascii_tbl(stdout);
     /* char array for ascii human table */
     unsigned char ascii[128] = {0};
 
-    for (unsigned char i = 0; i < 128; i++) {
+    for (unsigned char i = 0; i < sizeof(ascii); i++) {
         ascii[i] = i;
     }
 
@@ -80,7 +80,7 @@ void main(void)
     while (1) {
         /* Asks a number and return number in word*/
         int info;
-        fprintf(stdout, "%s ", "Enter number");
+        fprintf_P(stdout,  PSTR(ENTER_NUMBER));
         fscanf(stdin, "%d", &info);
         fprintf(stdout, "%d\n", info);
 
