@@ -65,7 +65,7 @@ void main(void)
     /* init uart0 */
     simple_uart0_init();
     stdin = stdout = &simple_uart0_io; /* stdin=stdout stream */
-    fprintf_P(stdout,  PSTR(STUDENT_NAME_CONSOLE)); /* print student name */
+    fprintf_P(stdout, PSTR(STUDENT_NAME_CONSOLE)); /* print student name */
     /* ascii table */
     print_ascii_tbl(stdout);
     /* char array for ascii human table */
@@ -80,7 +80,7 @@ void main(void)
     while (1) {
         /* Asks a number and return number in word*/
         int info;
-        fprintf_P(stdout,  PSTR(ENTER_NUMBER));
+        fprintf_P(stdout, PSTR(ENTER_NUMBER));
         fscanf(stdin, "%d", &info);
         fprintf(stdout, "%d\n", info);
 
