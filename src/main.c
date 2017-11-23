@@ -37,7 +37,7 @@ static inline void student_lcd(void)
     lcd_home();
     lcd_puts_P(PSTR(STUDENT_NAME_LCD));
 }
-
+/* led blinking in 3 colors*/
 static inline void blink_leds(void)
 {
     PORTA |= _BV(PORTA0);
