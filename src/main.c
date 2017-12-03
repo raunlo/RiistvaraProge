@@ -1,95 +1,126 @@
+#include <avr/pgmspace.h>
 #include <stdio.h>
+#include <time.h>
 #include <avr/io.h>
 #include <util/delay.h>
-#include "uart.h"
 #include "../lib/hd44780_111/hd44780.h"
-#define BLINK_DELAY_MS 100
+#include "../lib/andygock_avr-uart/uart.h"
 #include "hmi_msg.h"
 #include "print_helper.h"
+#include <avr/interrupt.h>
+#include "../lib/helius_microrl/microrl.h"
+#include "cl_microrl.h"
+#include "../lib/andygock_avr-uart/uart.h"
 
-static inline void init_leds(void)
+#define BLINK_DELAY_MS  2000
+#define LED_RED         PORTA0 // Arduino Mega digital pin 22
+#define LED_GREEN       PORTA2 // Arduino Mega digital pin 24
+#define LED_BLUE        PORTA4 // Arduino Mega digital pin 26
+
+#define UART_BAUD           9600
+#define UART_STATUS_MASK    0x00FF
+
+static microrl_t rl;
+static microrl_t *prl = &rl;
+static inline void heartbeat(void)
 {
-    /* Set port B pin 7 for output for Arduino Mega yellow LED */
-    DDRA |= _BV(DDA0);
-    DDRA |= _BV(DDA2);
-    DDRA |= _BV(DDA4);
+    static time_t prev_time;
+    char ascii_buf[11] = {0x00};
+    time_t now = time(NULL);
+
+    if (prev_time != now) {
+        //Print uptime to uart1
+        ltoa(now, ascii_buf, 10);
+        uart1_puts_p(PSTR("Uptime: "));
+        uart1_puts(ascii_buf);
+        uart1_puts_p(PSTR(" s.\r\n"));
+        PORTA ^= _BV(LED_RED);
+        PORTA ^= _BV(LED_GREEN);
+        PORTA ^= _BV(LED_BLUE);
+        prev_time = now;
+    }
+}
+
+static inline void init_led(void)
+{
+    DDRA |= _BV(LED_GREEN);
+    DDRA |= _BV(LED_BLUE);
+    DDRA |= _BV(LED_RED);
     DDRB |= _BV(DDB7);
     PORTB &= ~_BV(PORTB7);
 }
 
-/* Init error console as stderr in UART1 and print user code info */
-static inline void init_errcon(void)
+
+static inline void init_con_uart1(void)
 {
-    simple_uart1_init();
-    stderr = &simple_uart1_out;
-    fprintf_P(stderr, PSTR(VER_FW),
-              PSTR(FW_VERSION), PSTR(__DATE__), PSTR(__TIME__));
-    fprintf_P(stderr, PSTR(VER_LIBC),
-              PSTR(__AVR_LIBC_VERSION_STRING__), PSTR(__VERSION__));
+    uart1_puts_p(PSTR(VER_LIBC));
+    uart1_puts_p(PSTR(VER_FW));
 }
 
-/* lcd init and print on lcd screen student name*/
-static inline void student_lcd(void)
+
+static inline void print_sys_time(void)
 {
-    init_leds();
-    init_errcon();
-    lcd_init();
-    lcd_home();
+    char iso_time[20] = {0x00};
+    struct tm now_tm;
+    time_t now = time(NULL);
+    gmtime_r(&now, &now_tm);
+    isotime_r(&now_tm, iso_time);
+    uart1_puts(iso_time);
+    uart1_puts_p(PSTR("\r\n"));
+}
+static inline void init_sys_timer(void)
+{
+    TCCR1A = 0;
+    TCCR1B = 0;
+    TCCR1B |= _BV(WGM12); // Turn on CTC (Clear Timer on Compare)
+    TCCR1B |= _BV(CS12); // fCPU/256
+    OCR1A = 62549; // Note that it is actually two registers OCR5AH and OCR5AL
+    TIMSK1 |= _BV(OCIE1A); // Output Compare A Match Interrupt Enable
+}
+
+static inline void name()
+{
+    uart0_puts_p(PSTR(STUDENT_NAME_CONSOLE));
+    uart0_puts_p(PSTR("\r\n"));
+    lcd_clrscr();
     lcd_puts_P(PSTR(STUDENT_NAME_LCD));
 }
-/* led blinking in 3 colors*/
-static inline void blink_leds(void)
+
+static inline void start_cli(void)
 {
-    PORTA |= _BV(PORTA0);
-    _delay_ms(BLINK_DELAY_MS);
-    /* Set port B pin 7 high to turn Arduino Mega yellow LED off */
-    PORTA &= ~_BV(PORTA0);
-    _delay_ms(BLINK_DELAY_MS);
-    /* Set port B pin 6 high to turn Arduino Mega yellow LED off */
-    PORTA |= _BV(PORTA2);
-    _delay_ms(BLINK_DELAY_MS);
-    /* Set port B pin 6 high to turn Arduino Mega yellow LED off */
-    PORTA &= ~_BV(PORTA2);
-    _delay_ms(BLINK_DELAY_MS);
-    /* Set port B pin 5 high to turn Arduino Mega yellow LED off */
-    PORTA |= _BV(PORTA4);
-    _delay_ms(BLINK_DELAY_MS);
-    /* Set port B pin 5 high to turn Arduino Mega yellow LED off */
-    PORTA &= ~_BV(PORTA4);
-    _delay_ms(BLINK_DELAY_MS);
+    // Call init with ptr to microrl instance and print callback
+    microrl_init (prl, uart0_puts);
+    // Set callback for execute
+    microrl_set_execute_callback (prl, cli_execute);
+}
+
+static inline void startup()
+{
+    init_led();
+    uart1_init(UART_BAUD_SELECT(UART_BAUD, F_CPU));
+    uart0_init(UART_BAUD_SELECT(UART_BAUD, F_CPU));
+    init_con_uart1();
+    init_sys_timer();
+    lcd_init();
+    lcd_home();
+    name();
+    start_cli();
+    sei();
 }
 
 void main(void)
 {
-    student_lcd();
-    /* init uart0 */
-    simple_uart0_init();
-    stdin = stdout = &simple_uart0_io; /* stdin=stdout stream */
-    fprintf_P(stdout, PSTR(STUDENT_NAME_CONSOLE)); /* print student name */
-    /* ascii table */
-    print_ascii_tbl(stdout);
-    /* char array for ascii human table */
-    unsigned char ascii[128] = {0};
-
-    for (unsigned char i = 0; i < sizeof(ascii); i++) {
-        ascii[i] = i;
-    }
-
-    print_for_human(stdout, ascii, 128);
+    startup();
+    print_sys_time();
 
     while (1) {
-        /* Asks a number and return number in word*/
-        int info;
-        fprintf_P(stdout, PSTR(ENTER_NUMBER));
-        fscanf(stdin, "%d", &info);
-        fprintf(stdout, "%d\n", info);
-
-        if (info >= 0 && info < 10) {
-            fprintf_P(stdout, PSTR(REPLY_NUMBER), (PGM_P)pgm_read_word(&(numbers[info])));
-        } else {
-            fprintf_P(stdout, PSTR(WRONG_NUMBER));
-        }
-
-        blink_leds();
+        heartbeat();
+        microrl_insert_char(prl, (uart0_getc() & UART_STATUS_MASK));
     }
 }
+
+ISR(TIMER1_COMPA_vect)
+{
+    system_tick();
+}
+
