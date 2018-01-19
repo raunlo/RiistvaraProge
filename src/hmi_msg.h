@@ -36,6 +36,8 @@
 #define IMPLEMENTED_COMMANDS "Implemented commands:\r\n"
 #define COMMAND_ARGUMENTS "Command had following arguments:\r\n"
 
+#define access_denied "access denied"
+
 
 
 extern PGM_P const numbers[];

@@ -20,11 +20,10 @@ void print_ascii_tbl (void)
  Method to convert byte to uint8_t HEX */
 char *bin2hex(unsigned char *p, int len)
 {
-    char *hex = malloc(((2*len) + 1));
+    char *hex = malloc(((2 * len) + 1));
     char *r = hex;
 
-    while(len && p)
-    {
+    while (len && p) {
         (*r) = ((*p) & 0xF0) >> 4;
         (*r) = ((*r) <= 9 ? '0' + (*r) : 'A' - 10 + (*r));
         r++;
@@ -34,8 +33,8 @@ char *bin2hex(unsigned char *p, int len)
         p++;
         len--;
     }
-    *r = '\0';
 
+    *r = '\0';
     return hex;
 }
 

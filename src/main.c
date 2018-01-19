@@ -32,7 +32,7 @@ typedef enum {
     door_closed
 } door_state_t;
 
-volatile uint32_t system_time;
+volatile uint16_t system_time;
 door_state_t door = door_closed;
 
 static microrl_t rl;
@@ -106,11 +106,11 @@ static inline void start_cli(void)
     microrl_init (prl, uart0_puts);
     // Set callback for execute
     microrl_set_execute_callback (prl, cli_execute);
-}	
+}
 
-static inline uint32_t current_time(void)
+static inline uint16_t current_time(void)
 {
-    uint32_t cur_time;
+    uint16_t cur_time = 0;
     ATOMIC_BLOCK(ATOMIC_FORCEON) {
         cur_time = system_time;
     }
@@ -133,69 +133,73 @@ static inline void startup()
 
 static inline void init_rfid_reader(void)
 {
-  MFRC522_init();
-  PCD_Init();
+    MFRC522_init();
+    PCD_Init();
 }
-
-static inline void handle_door()
+/* handles door opening */
+static inline void handle_door(void)
 {
-	Uid uid;
-	Uid *uid_ptr = &uid;
+    Uid uid;
+    Uid *uid_ptr = &uid;
+    uint16_t time = current_time();
+    static uint16_t door_open_time;
+    static uint16_t msg_open_time;
+    char  *name;
+    static char * logged_user;
+    byte bufferATQA[10];
+    byte bufferSize[10];
 
+    if (PICC_IsNewCardPresent()) {
+        PICC_ReadCardSerial(&uid);
+        name = bin2hex(uid_ptr->uidByte, uid_ptr->size);
+        char *find_user = find(name);
+        logged_user = find_user;
 
-	 uint32_t time = current_time();
-	 static uint32_t door_open_time;
-	 static uint32_t msg_open_time;
-	 char  *name;
+        if (find_user != NULL) {
+            lcd_clr(LCD_ROW_2_START, LCD_VISIBLE_COLS);
+            lcd_goto(LCD_ROW_2_START);
+            lcd_puts(logged_user);
+            DOOR_OPEN;
+            door = door_opening;
+        } else {
+            lcd_clr(LCD_ROW_2_START, LCD_VISIBLE_COLS);
+            lcd_goto(LCD_ROW_2_START);
+            lcd_puts_P(PSTR(access_denied));
+            door = door_opening;
+            DOOR_CLOSE;
+        }
 
-	 byte bufferATQA[10];
-   byte bufferSize[10];
-	
-	if (PICC_IsNewCardPresent())
-	{
-		 PICC_ReadCardSerial(&uid);		 
-	name = bin2hex(uid_ptr->uidByte,uid_ptr->size);
-	card_rfid *find_user = find(name);
-	
-   			uart1_puts(name);
-		 if(find_user)
-		 {
-		 	lcd_clr(LCD_ROW_2_START, LCD_VISIBLE_COLS);
-		 
-                    lcd_goto(LCD_ROW_2_START);
-                    lcd_puts(find_user->user);
-                     DOOR_OPEN; 
-		 	door = door_opening;
-		 } else {		 
-		 		lcd_clr(LCD_ROW_2_START, LCD_VISIBLE_COLS);
-                    lcd_goto(LCD_ROW_2_START);
-                    lcd_puts("Accsess denied!");
-                    door = door_opening;
-		 } 	
-	}	
-	PICC_WakeupA(bufferATQA, bufferSize);
-	switch(door){
-		case door_opening:                    
-                    door = door_open;
-                    msg_open_time = time;
-                    door_open_time = time;
-                                    
-					break;
-		case door_open:				
-				if(time -door_open_time > 2) {
-					lcd_clr(LCD_ROW_2_START, LCD_VISIBLE_COLS);
-					door = door_closing;
-				}
-				break;		
-		case door_closing:
-		if(time - msg_open_time>5) {
-			door = door_closed;
-			DOOR_CLOSE;			
-		}
-		break;		
-		case door_closed:
-		break;
-	}	
+        free(name);
+        PICC_WakeupA(bufferATQA, bufferSize);
+    }
+
+    if (time - msg_open_time > 5 && logged_user != NULL ) {
+        lcd_clr(LCD_ROW_2_START, LCD_VISIBLE_COLS);
+        DOOR_CLOSE;
+        logged_user = NULL;
+    }
+
+    switch (door) {
+    case door_opening:
+        door = door_open;
+        msg_open_time = time;
+        door_open_time = time;
+        break;
+
+    case door_open:
+        if (time - door_open_time > 3) {
+            door = door_closing;
+            logged_user = NULL;
+        }
+
+        break;
+
+    case door_closing:
+        break;
+
+    case door_closed:
+        break;
+    }
 }
 
 void main(void)
@@ -207,7 +211,6 @@ void main(void)
     while (1) {
         heartbeat();
         microrl_insert_char(prl, (uart0_getc() & UART_STATUS_MASK));
-       
         handle_door();
     }
 }
