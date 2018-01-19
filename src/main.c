@@ -146,20 +146,18 @@ static inline void handle_door()
 	 uint32_t time = current_time();
 	 static uint32_t door_open_time;
 	 static uint32_t msg_open_time;
-	static char  *name;
+	 char  *name;
 
 	 byte bufferATQA[10];
    byte bufferSize[10];
-
+	
 	if (PICC_IsNewCardPresent())
 	{
-		 PICC_ReadCardSerial(&uid);
-	
-		 
+		 PICC_ReadCardSerial(&uid);		 
 	name = bin2hex(uid_ptr->uidByte,uid_ptr->size);
 	card_rfid *find_user = find(name);
 	
-   
+   			uart1_puts(name);
 		 if(find_user)
 		 {
 		 	lcd_clr(LCD_ROW_2_START, LCD_VISIBLE_COLS);

@@ -8,7 +8,7 @@
 /* method to acssess linked list items*/
 card_rfid  *head;
 
-  card_rfid  find(  char* a)
+  card_rfid*  find(  char* a)
 {
 	card_rfid *curr = head;
 	while(curr !=NULL) 
@@ -19,7 +19,6 @@ card_rfid  *head;
      			      		 
       	curr =curr->next;	
      	}
-     	free(curr);
       	return NULL;
       	
 }
