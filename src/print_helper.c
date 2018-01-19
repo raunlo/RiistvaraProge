@@ -1,5 +1,7 @@
 #include <avr/io.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "print_helper.h"
 #include "../lib/andygock_avr-uart/uart.h"
 #include <avr/pgmspace.h>
@@ -14,9 +16,28 @@ void print_ascii_tbl (void)
 
     uart0_puts_p(PSTR("\r\n"));
 }
+/*viide: https://stackoverflow.com/questions/3408706/hexadecimal-string-to-byte-array-in-c/23898449#23898449
+ Method to convert byte to uint8_t HEX */
+char *bin2hex(unsigned char *p, int len)
+{
+    char *hex = malloc(((2*len) + 1));
+    char *r = hex;
 
+    while(len && p)
+    {
+        (*r) = ((*p) & 0xF0) >> 4;
+        (*r) = ((*r) <= 9 ? '0' + (*r) : 'A' - 10 + (*r));
+        r++;
+        (*r) = ((*p) & 0x0F);
+        (*r) = ((*r) <= 9 ? '0' + (*r) : 'A' - 10 + (*r));
+        r++;
+        p++;
+        len--;
+    }
+    *r = '\0';
 
-
+    return hex;
+}
 
 /* Method to print human table and what isn't in asci table, will be printed in hex code*/
 void print_for_human ( const unsigned char *array,

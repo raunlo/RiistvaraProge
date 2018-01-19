@@ -1,6 +1,8 @@
 #include <avr/pgmspace.h>
 #include <stdio.h>
 #include <time.h>
+#include <util/atomic.h>
+#include <string.h>
 #include <avr/io.h>
 #include <util/delay.h>
 #include "../lib/hd44780_111/hd44780.h"
@@ -11,14 +13,27 @@
 #include "../lib/helius_microrl/microrl.h"
 #include "cl_microrl.h"
 #include "../lib/andygock_avr-uart/uart.h"
+#include "../lib/matejx_avr_lib/mfrc522.h"
+#include "rfid.h"
 
 #define BLINK_DELAY_MS  2000
-#define LED_RED         PORTA0 // Arduino Mega digital pin 22
 #define LED_GREEN       PORTA2 // Arduino Mega digital pin 24
 #define LED_BLUE        PORTA4 // Arduino Mega digital pin 26
+#define DOOR_OPEN PORTA |= _BV(PORTA0)
+#define DOOR_CLOSE PORTA &= ~_BV(PORTA0)
 
 #define UART_BAUD           9600
 #define UART_STATUS_MASK    0x00FF
+
+typedef enum {
+    door_opening,
+    door_open,
+    door_closing,
+    door_closed
+} door_state_t;
+
+volatile uint32_t system_time;
+door_state_t door = door_closed;
 
 static microrl_t rl;
 static microrl_t *prl = &rl;
@@ -34,7 +49,6 @@ static inline void heartbeat(void)
         uart1_puts_p(PSTR("Uptime: "));
         uart1_puts(ascii_buf);
         uart1_puts_p(PSTR(" s.\r\n"));
-        PORTA ^= _BV(LED_RED);
         PORTA ^= _BV(LED_GREEN);
         PORTA ^= _BV(LED_BLUE);
         prev_time = now;
@@ -45,7 +59,7 @@ static inline void init_led(void)
 {
     DDRA |= _BV(LED_GREEN);
     DDRA |= _BV(LED_BLUE);
-    DDRA |= _BV(LED_RED);
+    DDRA |= _BV(PORTA0);
     DDRB |= _BV(DDB7);
     PORTB &= ~_BV(PORTB7);
 }
@@ -92,6 +106,15 @@ static inline void start_cli(void)
     microrl_init (prl, uart0_puts);
     // Set callback for execute
     microrl_set_execute_callback (prl, cli_execute);
+}	
+
+static inline uint32_t current_time(void)
+{
+    uint32_t cur_time;
+    ATOMIC_BLOCK(ATOMIC_FORCEON) {
+        cur_time = system_time;
+    }
+    return cur_time;
 }
 
 static inline void startup()
@@ -108,19 +131,92 @@ static inline void startup()
     sei();
 }
 
+static inline void init_rfid_reader(void)
+{
+  MFRC522_init();
+  PCD_Init();
+}
+
+static inline void handle_door()
+{
+	Uid uid;
+	Uid *uid_ptr = &uid;
+
+
+	 uint32_t time = current_time();
+	 static uint32_t door_open_time;
+	 static uint32_t msg_open_time;
+	static char  *name;
+
+	 byte bufferATQA[10];
+   byte bufferSize[10];
+
+	if (PICC_IsNewCardPresent())
+	{
+		 PICC_ReadCardSerial(&uid);
+	
+		 
+	name = bin2hex(uid_ptr->uidByte,uid_ptr->size);
+	card_rfid *find_user = find(name);
+	
+   
+		 if(find_user)
+		 {
+		 	lcd_clr(LCD_ROW_2_START, LCD_VISIBLE_COLS);
+		 
+                    lcd_goto(LCD_ROW_2_START);
+                    lcd_puts(find_user->user);
+                     DOOR_OPEN; 
+		 	door = door_opening;
+		 } else {		 
+		 		lcd_clr(LCD_ROW_2_START, LCD_VISIBLE_COLS);
+                    lcd_goto(LCD_ROW_2_START);
+                    lcd_puts("Accsess denied!");
+                    door = door_opening;
+		 } 	
+	}	
+	PICC_WakeupA(bufferATQA, bufferSize);
+	switch(door){
+		case door_opening:                    
+                    door = door_open;
+                    msg_open_time = time;
+                    door_open_time = time;
+                                    
+					break;
+		case door_open:				
+				if(time -door_open_time > 2) {
+					lcd_clr(LCD_ROW_2_START, LCD_VISIBLE_COLS);
+					door = door_closing;
+				}
+				break;		
+		case door_closing:
+		if(time - msg_open_time>5) {
+			door = door_closed;
+			DOOR_CLOSE;			
+		}
+		break;		
+		case door_closed:
+		break;
+	}	
+}
+
 void main(void)
 {
     startup();
     print_sys_time();
+    init_rfid_reader();
 
     while (1) {
         heartbeat();
         microrl_insert_char(prl, (uart0_getc() & UART_STATUS_MASK));
+       
+        handle_door();
     }
 }
 
 ISR(TIMER1_COMPA_vect)
 {
     system_tick();
+    system_time++;
 }
 

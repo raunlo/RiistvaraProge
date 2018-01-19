@@ -18,7 +18,7 @@
 #define SPI_CS_LOW MFRC522_SS_PORT &= ~_BV(MFRC522_SS_BIT)
 #define SPI_CS_HIGH MFRC522_SS_PORT |= _BV(MFRC522_SS_BIT)
 
-static const byte FIFO_SIZE = 64;		// The FIFO is 64 bytes.
+//static const byte FIFO_SIZE = 64;		// The FIFO is 64 bytes.
 
 void MFRC522_init() {
 	// Set the chipSelectPin as digital output, do not select the slave yet
@@ -435,7 +435,7 @@ byte PICC_REQA_or_WUPA(	byte command, 		///< The command to send - PICC_CMD_REQA
 byte PICC_Select(	Uid *uid,			///< Pointer to Uid struct. Normally output, but can also be used to supply a known UID.
 					byte validBits		///< The number of known UID bits supplied in *uid. Normally 0. If set you must also supply uid->size.
 ) {
-	bool uidComplete;
+	bool uidComplete;	
 	bool selectDone;
 	bool useCascadeTag;
 	byte cascadeLevel	= 1;
